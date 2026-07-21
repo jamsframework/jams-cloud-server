@@ -32,6 +32,12 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import jakarta.ejb.EJBException;
 import javax.sql.DataSource;
+import java.security.SecureRandom;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 
@@ -98,6 +104,66 @@ public class DBInit {
                     + i.getDescription() + " from file: " + i.getScript());
         }
         flyway.migrate();
-                
+
+        bootstrapAdmin();
+    }
+
+    /**
+     * Ensures an administrator account exists. Login and password come from the
+     * ADMIN_LOGIN / ADMIN_PASSWORD environment variables (login defaults to
+     * "admin"); if no password is given a random one is generated and logged
+     * once. The password is stored hashed. An existing account is left untouched,
+     * so this never overwrites a changed password.
+     */
+    private void bootstrapAdmin() {
+        String login = System.getenv("ADMIN_LOGIN");
+        if (login == null || login.isEmpty()) {
+            login = "admin";
+        }
+        String password = System.getenv("ADMIN_PASSWORD");
+        boolean generated = password == null || password.isEmpty();
+        if (generated) {
+            password = generatePassword();
+        }
+
+        try (Connection conn = DriverManager.getConnection(
+                DATABASE_URL, DATABASE_USER, DATABASE_PW)) {
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM `user` WHERE login = ?")) {
+                ps.setString(1, login);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        log.info("Admin user '" + login + "' already exists; left unchanged.");
+                        return;
+                    }
+                }
+            }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO `user` (login, password, name, email, admin) VALUES (?,?,?,?,1)")) {
+                ps.setString(1, login);
+                ps.setString(2, PasswordHasher.hash(password));
+                ps.setString(3, "Administrator");
+                ps.setString(4, login + "@localhost");
+                ps.executeUpdate();
+            }
+            if (generated) {
+                log.warning("Created admin user '" + login + "' with a GENERATED password: "
+                        + password + " -- set ADMIN_PASSWORD to control it, and change it after first login.");
+            } else {
+                log.info("Created admin user '" + login + "' from ADMIN_PASSWORD.");
+            }
+        } catch (SQLException e) {
+            log.log(Level.SEVERE, "Unable to bootstrap admin user", e);
+        }
+    }
+
+    private static String generatePassword() {
+        final String alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+        SecureRandom rnd = new SecureRandom();
+        StringBuilder sb = new StringBuilder(16);
+        for (int i = 0; i < 16; i++) {
+            sb.append(alphabet.charAt(rnd.nextInt(alphabet.length())));
+        }
+        return sb.toString();
     }
 }

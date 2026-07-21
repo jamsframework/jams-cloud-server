@@ -23,6 +23,8 @@ package jams.server.service;
 
 import jams.server.entities.User;
 import jams.server.entities.Users;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
@@ -32,12 +34,14 @@ import jakarta.servlet.http.HttpSession;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
@@ -56,7 +60,7 @@ public class UserFacadeREST extends AbstractFacade<User> {
     public UserFacadeREST() {
         super(User.class);
     }
-        
+
     @PUT
     @Path("create")
     @Consumes({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})
@@ -65,10 +69,12 @@ public class UserFacadeREST extends AbstractFacade<User> {
         if (isAdmin(req)) {
             if (!findByName(entity.getLogin()).isEmpty())
                 return Response.status(Response.Status.CONFLICT).build();
-            
+
+            entity.setPassword(PasswordHasher.hash(
+                    entity.getPassword() == null ? "" : entity.getPassword()));
             super.create(entity);
             if (entity.getId() != null)
-                return Response.ok(entity).build();
+                return Response.ok(scrub(entity)).build();
             else{
                 return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
             }
@@ -108,13 +114,13 @@ public class UserFacadeREST extends AbstractFacade<User> {
             originalEntity.setAdmin(entity.getAdmin());
         }
 
-        // Only update password if it is not empty
-        if (!entity.getPassword().isEmpty()) {
-            originalEntity.setPassword(entity.getPassword());
+        // Only update password if a new one was supplied; store it hashed.
+        if (entity.getPassword() != null && !entity.getPassword().isEmpty()) {
+            originalEntity.setPassword(PasswordHasher.hash(entity.getPassword()));
         }
 
         super.edit(originalEntity);
-        return Response.ok(user).build();
+        return Response.ok(scrub(originalEntity)).build();
     }
 
     @DELETE
@@ -126,7 +132,7 @@ public class UserFacadeREST extends AbstractFacade<User> {
             if (o == null)
                 return null;
             super.remove(o);
-            return Response.ok(o).build();
+            return Response.ok(scrub(o)).build();
         }
         return Response.status(Response.Status.FORBIDDEN).build();
     }
@@ -136,18 +142,18 @@ public class UserFacadeREST extends AbstractFacade<User> {
     @Produces({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})
     public Response find(@PathParam("id") Integer id, @Context HttpServletRequest req) {
         if (isAdmin(req)) {
-            return Response.ok(super.find(id)).build();
+            return Response.ok(scrub(super.find(id))).build();
         } else {
             return Response.status(Response.Status.FORBIDDEN).build();
         }
     }
-   
+
     @GET
     @Path("all")
     @Produces({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})
     public Response findAll(@Context HttpServletRequest req) {
         if (isAdmin(req)) {
-            return Response.ok(new Users(super.findAll())).build();
+            return Response.ok(scrub(new Users(super.findAll()))).build();
         } else {
             return Response.status(Response.Status.FORBIDDEN).build();
         }
@@ -160,7 +166,7 @@ public class UserFacadeREST extends AbstractFacade<User> {
         if (!isAdmin(req)) {
             return Response.status(Response.Status.FORBIDDEN).build();
         }
-        return Response.ok(new Users(super.findRange(new int[]{from, to}))).build();
+        return Response.ok(scrub(new Users(super.findRange(new int[]{from, to})))).build();
     }
 
     @GET
@@ -175,27 +181,29 @@ public class UserFacadeREST extends AbstractFacade<User> {
         return em;
     }
 
-    @GET
+    @POST
     @Path("login")
     @Produces({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})
-    public Response login(@QueryParam("login") String login, @QueryParam("password") String password, @Context HttpServletRequest req) {
+    public Response login(@HeaderParam(HttpHeaders.AUTHORIZATION) String authorization,
+            @Context HttpServletRequest req) {
         HttpSession session = req.getSession(true);
 
-        List result = findByNameAndPassword(login, password);
-
-        User user;
-        if (result.size() > 0) {
-            user = (User) result.get(0);
-            session.setAttribute("userid", user.getId());
-            session.setAttribute("userlogin", user.getLogin());
-            return Response.ok(user).build();
-        } else {
-            session.setAttribute("userid", "-1");
-            session.setAttribute("userlogin", "");
-            return Response.status(Status.FORBIDDEN).build();            
+        // Credentials arrive as an "Authorization: Basic base64(login:password)"
+        // header, so they never appear in the URL or the server access log.
+        String[] creds = decodeBasic(authorization);
+        if (creds != null) {
+            User user = findUserByLogin(creds[0]);
+            if (user != null && PasswordHasher.verify(creds[1], user.getPassword())) {
+                session.setAttribute("userid", user.getId());
+                session.setAttribute("userlogin", user.getLogin());
+                return Response.ok(scrub(user)).build();
+            }
         }
+        session.setAttribute("userid", "-1");
+        session.setAttribute("userlogin", "");
+        return Response.status(Status.FORBIDDEN).build();
     }
-    
+
     @GET
     @Path("logout")
     @Produces({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})
@@ -212,18 +220,54 @@ public class UserFacadeREST extends AbstractFacade<User> {
     public Response isConnected(@Context HttpServletRequest req) {
         if (!isLoggedIn(req)) {
             return Response.ok(Boolean.toString(false)).build();
-        }        
+        }
         return Response.ok(Boolean.toString(true)).build();
     }
 
-    private List findByNameAndPassword(String login, String password) {
-        return em.createQuery(
-                "SELECT u FROM User u WHERE u.login = :login AND u.password = :password")
-                .setParameter("login", login)
-                .setParameter("password", password)
-                .getResultList();
+    /** Removes the (hashed) password from a user before it leaves the server. */
+    private User scrub(User u) {
+        if (u != null) {
+            em.detach(u);
+            u.setPassword(null);
+        }
+        return u;
     }
-    
+
+    private Users scrub(Users users) {
+        if (users != null && users.getUsers() != null) {
+            for (User u : users.getUsers()) {
+                scrub(u);
+            }
+        }
+        return users;
+    }
+
+    private static String[] decodeBasic(String authorization) {
+        if (authorization == null || !authorization.regionMatches(true, 0, "Basic ", 0, 6)) {
+            return null;
+        }
+        try {
+            String creds = new String(
+                    Base64.getDecoder().decode(authorization.substring(6).trim()),
+                    StandardCharsets.UTF_8);
+            int idx = creds.indexOf(':');
+            if (idx < 0) {
+                return null;
+            }
+            return new String[]{creds.substring(0, idx), creds.substring(idx + 1)};
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private User findUserByLogin(String login) {
+        List<User> list = em.createQuery(
+                "SELECT u FROM User u WHERE u.login = :login", User.class)
+                .setParameter("login", login)
+                .getResultList();
+        return list.isEmpty() ? null : list.get(0);
+    }
+
     private List findByName(String login) {
         return em.createQuery(
                 "SELECT u FROM User u WHERE u.login LIKE :login")

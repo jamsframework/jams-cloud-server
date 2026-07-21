@@ -9,7 +9,9 @@ CREATE TABLE `user` (
     `admin` INT NOT NULL
 );
 
-INSERT INTO user VALUES(1,"admin","jamscloud","Administrator","god@heaven.org",1);
+-- No default account is seeded here anymore. The administrator is created at
+-- startup by DBInit from the ADMIN_LOGIN / ADMIN_PASSWORD environment variables,
+-- with the password stored hashed (see PasswordHasher).
 
 CREATE TABLE files(
     `id` INT PRIMARY KEY AUTO_INCREMENT,

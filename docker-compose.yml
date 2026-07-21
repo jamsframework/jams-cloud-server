@@ -33,14 +33,17 @@ services:
       DATABASE_URL: "jdbc:mysql://db:3306/${MYSQL_DB:-jamsserver}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&zeroDateTimeBehavior=CONVERT_TO_NULL"
       DATABASE_USER: ${MYSQL_USER:-jams}
       DATABASE_PASSWORD: ${MYSQL_PASSWORD:-jams}
+      # Administrator account, created hashed on first start (see DBInit)
+      ADMIN_LOGIN: ${ADMIN_LOGIN:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       # Server working directories and model heap
       UPLOAD_DIRECTORY: /opt/payara/jams/upload/
       TMP_DIRECTORY: /opt/payara/jams/tmp/
       EXEC_DIRECTORY: /opt/payara/jams/exec/
       SERVER_MAX_MEM: ${SERVER_MAX_MEM:-8g}
     ports:
-      - "8080:8080"   # application (context root /jamscloud)
-      - "4848:4848"   # Payara admin console
+      - "8080:8080"            # application (context root /jamscloud)
+      - "127.0.0.1:4848:4848"  # Payara admin: localhost only, not exposed to the network
     volumes:
       - jams-data:/opt/payara/jams
     restart: unless-stopped
