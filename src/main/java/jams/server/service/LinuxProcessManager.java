@@ -27,7 +27,6 @@ import jams.tools.FileTools;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
-import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.logging.Logger;
 
@@ -42,18 +41,13 @@ public class LinuxProcessManager extends AbstractProcessManager {
     @Override
     protected Integer getProcessPid(Process process) throws IOException {
         logger.fine("obtaining process id");
-        if (process.getClass().getName().equals("java.lang.UNIXProcess")) {
-            /* get the PID on unix/linux systems */
-            try {
-                Field f = process.getClass().getDeclaredField("pid");
-                f.setAccessible(true);
-                return f.getInt(process);
-            } catch (Throwable e) {
-                return -1;
-            }
-
+        // Process.pid() (Java 9+) replaces the old reflection on java.lang.UNIXProcess,
+        // which no longer exists on Java 17 and always yielded -1 (breaking job tracking).
+        try {
+            return (int) process.pid();
+        } catch (Throwable e) {
+            return -1;
         }
-        return -1;
     }
 
     @Override
@@ -130,8 +124,9 @@ public class LinuxProcessManager extends AbstractProcessManager {
             "cloud.jap",
             "-n",
             "-m",
-            modelFile,
-            ">" + DEFAULT_INFO_LOG + " 2>&1&"};
+            modelFile};
+        // Note: stdout/stderr are redirected by ProcessBuilder in deploy(), so no
+        // shell redirect (">info.log 2>&1&") is appended to the command anymore.
 
         logger.fine("start process: " + Arrays.toString(command));
 
