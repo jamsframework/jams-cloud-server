@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence version="3.0" xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence https://jakarta.ee/xml/ns/persistence/persistence_3_0.xsd">
+  <persistence-unit name="jams-serverPU" transaction-type="JTA">
+    <jta-data-source>jdbc/jamsserver</jta-data-source>
+    <class>jams.server.entities.File</class>
+    <class>jams.server.entities.Job</class>
+    <class>jams.server.entities.User</class>
+    <class>jams.server.entities.Workspace</class>
+    <class>jams.server.entities.WorkspaceFileAssociation</class>
+    <exclude-unlisted-classes>false</exclude-unlisted-classes>
+    <properties>
+    </properties>
+  </persistence-unit>
+</persistence>

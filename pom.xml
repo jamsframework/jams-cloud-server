@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.jams</groupId>
+    <artifactId>jams-cloud-server</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>war</packaging>
+    <name>JAMS Cloud Server</name>
+
+    <properties>
+        <maven.compiler.release>17</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <failOnMissingWebXml>false</failOnMissingWebXml>
+
+        <jams.version>1.0-SNAPSHOT</jams.version>
+        <jna.version>5.14.0</jna.version>
+        <flyway.version>10.20.1</flyway.version>
+        <mysql.version>8.4.0</mysql.version>
+        <jersey.version>3.1.9</jersey.version>
+    </properties>
+
+    <dependencies>
+        <!-- Jakarta EE 10, vom Payara-6-Container bereitgestellt -->
+        <dependency>
+            <groupId>jakarta.platform</groupId>
+            <artifactId>jakarta.jakartaee-web-api</artifactId>
+            <version>10.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- MultiPartFeature (Datei-Upload) referenziert in ApplicationConfig; Payara liefert Jersey -->
+        <dependency>
+            <groupId>org.glassfish.jersey.media</groupId>
+            <artifactId>jersey-media-multipart</artifactId>
+            <version>${jersey.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- JAMS-Framework: Modell-Handling zur Laufzeit; bringt jams-api transitiv -->
+        <dependency>
+            <groupId>org.jams</groupId>
+            <artifactId>jams-main</artifactId>
+            <version>${jams.version}</version>
+        </dependency>
+
+        <!-- Geteilte Entities. Kompiliert wird gegen die (javax-)Originalklassen; die
+             Server-Source berührt deren Annotationen nicht. Schritt 2 (Eclipse Transformer)
+             erzeugt daraus die jakarta-Variante und packt SIE statt dieser ins WAR. Bis
+             dahin: provided (nicht bundeln). -->
+        <dependency>
+            <groupId>org.jams</groupId>
+            <artifactId>jams-cloud-core</artifactId>
+            <version>${jams.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Native Prozesssteuerung (com.sun.jna in Linux/Win64ProcessManager) -->
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+            <version>${jna.version}</version>
+        </dependency>
+        <!-- com.sun.jna.platform.win32 (Kernel32/WinNT) in Win64ProcessManager -->
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna-platform</artifactId>
+            <version>${jna.version}</version>
+        </dependency>
+
+        <!-- DigestUtils (Passwort-/Datei-Hashing) in FileFacadeREST/UserFacadeREST -->
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.17.1</version>
+        </dependency>
+
+        <!-- DB-Migrationen beim Start (DBInit) -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+            <version>${flyway.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+            <version>${flyway.version}</version>
+        </dependency>
+
+        <!-- MySQL-Treiber (für Flyway; Payara-Datasource kann ihn ebenfalls nutzen) -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>${mysql.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>jams-cloud-server</finalName>
+        <plugins>
+            <!-- 1. (Weg B) javax-Original von jams-cloud-core nach target/ kopieren -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-cloud-core</id>
+                        <phase>prepare-package</phase>
+                        <goals><goal>copy</goal></goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.jams</groupId>
+                                    <artifactId>jams-cloud-core</artifactId>
+                                    <version>${jams.version}</version>
+                                    <type>jar</type>
+                                    <outputDirectory>${project.build.directory}/transform-src</outputDirectory>
+                                    <destFileName>jams-cloud-core.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                            <overWriteSnapshots>true</overWriteSnapshots>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- 2. (Weg B) Eclipse Transformer: javax -> jakarta auf jams-cloud-core.
+                 Kompiliert wird gegen die javax-Originalklassen (provided), gepackt
+                 wird diese jakarta-Variante. Der Desktop-Client bleibt unberührt. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.eclipse.transformer</groupId>
+                        <artifactId>org.eclipse.transformer.cli</artifactId>
+                        <version>1.0.0</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <id>transform-cloud-core</id>
+                        <phase>prepare-package</phase>
+                        <goals><goal>run</goal></goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.build.directory}/transform-out"/>
+                                <java classname="org.eclipse.transformer.cli.JakartaTransformerCLI"
+                                      fork="true" failonerror="true">
+                                    <classpath refid="maven.plugin.classpath"/>
+                                    <arg value="${project.build.directory}/transform-src/jams-cloud-core.jar"/>
+                                    <arg value="${project.build.directory}/transform-out/jams-cloud-core-jakarta.jar"/>
+                                    <arg value="-o"/>
+                                </java>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- 3. WAR: transformierte jakarta-cloud-core nach WEB-INF/lib -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.4.0</version>
+                <configuration>
+                    <webResources>
+                        <resource>
+                            <directory>${project.build.directory}/transform-out</directory>
+                            <targetPath>WEB-INF/lib</targetPath>
+                            <includes>
+                                <include>*.jar</include>
+                            </includes>
+                        </resource>
+                    </webResources>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
