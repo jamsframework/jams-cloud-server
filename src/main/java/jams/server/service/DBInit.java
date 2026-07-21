@@ -53,20 +53,32 @@ public class DBInit {
     public static String DATABASE_PW = null;//"E:/test_server/exec/";
     
     static Properties p = new Properties() {
-        {                  
-            try {
-//                File f = new File("settings.properties");
-//                System.out.println(">>>>>>>>>>>>>> " + f.getAbsolutePath());
-                load(new FileReader("settings.properties"));
-                DATABASE_URL = getProperty("databaseUrl");
-                DATABASE_USER = getProperty("databaseUser");
-                DATABASE_PW = getProperty("databasePw");
-            } catch (Throwable ioe) {
-                log.log(Level.SEVERE, ioe.getMessage(), ioe);
-                ioe.printStackTrace();
+        {
+            File f = new File("settings.properties");
+            if (f.exists()) {
+                try {
+                    load(new FileReader(f));
+                } catch (Throwable ioe) {
+                    log.log(Level.WARNING, ioe.getMessage(), ioe);
+                }
             }
+            // Environment variables take precedence over settings.properties (Docker-friendly).
+            DATABASE_URL = cfg("DATABASE_URL", getProperty("databaseUrl"), null);
+            DATABASE_USER = cfg("DATABASE_USER", getProperty("databaseUser"), null);
+            DATABASE_PW = cfg("DATABASE_PASSWORD", getProperty("databasePw"), null);
         }
-    }; 
+    };
+
+    private static String cfg(String env, String prop, String def) {
+        String v = System.getenv(env);
+        if (v == null || v.isEmpty()) {
+            v = prop;
+        }
+        if (v == null || v.isEmpty()) {
+            v = def;
+        }
+        return v;
+    }
     
     @PostConstruct
     private void onStartup() {

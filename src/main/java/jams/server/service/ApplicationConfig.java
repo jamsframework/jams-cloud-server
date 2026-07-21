@@ -45,28 +45,39 @@ public class ApplicationConfig extends Application {
     
     static Properties p = new Properties() {
         {
-            Logger log = Logger.getLogger(ApplicationConfig.class.getName());                         
-            log.info("Try to set paths..");
-            try {
-                load(new FileReader("settings.properties"));
-                SERVER_UPLOAD_DIRECTORY = getProperty("upload-directory");
-                SERVER_TMP_DIRECTORY = getProperty("tmp-directory");
-                SERVER_EXEC_DIRECTORY = getProperty("exec-directory");
-                SERVER_MAX_MEM = getProperty("server-max-mem");
-                if (SERVER_MAX_MEM == null) {
-                    SERVER_MAX_MEM = "8g";
+            Logger log = Logger.getLogger(ApplicationConfig.class.getName());
+            File f = new File("settings.properties");
+            if (f.exists()) {
+                try {
+                    load(new FileReader(f));
+                } catch (Throwable ioe) {
+                    log.log(Level.WARNING, ioe.getMessage(), ioe);
                 }
-
-                log.info("Setting of paths was successful [" +
-                        SERVER_UPLOAD_DIRECTORY + ", " + 
-                        SERVER_TMP_DIRECTORY + ", " + 
-                        SERVER_EXEC_DIRECTORY + "]");
-            } catch (Throwable ioe) {
-                log.log(Level.SEVERE, ioe.getMessage(), ioe);
-                ioe.printStackTrace();
+            } else {
+                log.info("settings.properties not found; using environment variables");
             }
+            // Environment variables take precedence over settings.properties (Docker-friendly).
+            SERVER_UPLOAD_DIRECTORY = cfg("UPLOAD_DIRECTORY", getProperty("upload-directory"), null);
+            SERVER_TMP_DIRECTORY = cfg("TMP_DIRECTORY", getProperty("tmp-directory"), null);
+            SERVER_EXEC_DIRECTORY = cfg("EXEC_DIRECTORY", getProperty("exec-directory"), null);
+            SERVER_MAX_MEM = cfg("SERVER_MAX_MEM", getProperty("server-max-mem"), "8g");
+            log.info("JAMS server paths [" +
+                    SERVER_UPLOAD_DIRECTORY + ", " +
+                    SERVER_TMP_DIRECTORY + ", " +
+                    SERVER_EXEC_DIRECTORY + "], max-mem " + SERVER_MAX_MEM);
         }
-    };       
+    };
+
+    private static String cfg(String env, String prop, String def) {
+        String v = System.getenv(env);
+        if (v == null || v.isEmpty()) {
+            v = prop;
+        }
+        if (v == null || v.isEmpty()) {
+            v = def;
+        }
+        return v;
+    }
     @Override
     public Set<Class<?>> getClasses() {                                        
         Set<Class<?>> resources = new java.util.HashSet<>();
