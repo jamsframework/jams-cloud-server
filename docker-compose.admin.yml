@@ -1,0 +1,14 @@
+# Optional: publish the Payara admin console on the host (localhost only).
+#
+# The admin console is not needed to run the service, so the default deployment
+# does not publish it (avoiding clashes with an existing GlassFish/Payara on the
+# host). Enable it by adding this override file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.admin.yml up -d
+#
+# If port 4848 is already taken on the host, set a different one in .env, e.g.
+# ADMIN_PORT=14848, and reach the console at http://localhost:14848/.
+services:
+  server:
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-4848}:4848"

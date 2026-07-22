@@ -39,7 +39,10 @@ docker compose up --build
 ```
 
 - Application: <http://localhost:8080/jamscloud/> (REST base `…/jamscloud/webresources`)
-- Payara admin: <http://localhost:4848/>
+- Payara admin console: **not published by default** (not needed to run the
+  service). To expose it on localhost, add the override:
+  `docker compose -f docker-compose.yml -f docker-compose.admin.yml up -d` —
+  then <http://localhost:4848/> (host port configurable via `ADMIN_PORT`).
 
 Configuration is entirely environment-driven (see `docker-compose.yml`); MySQL
 host/credentials, the Flyway migration URL and the upload/tmp/exec directories
@@ -49,7 +52,8 @@ all come from environment variables. Flyway creates the schema on first start.
 
 Port 8080 is published on `0.0.0.0`, so the server is reachable from other hosts
 as `http://<host-ip>:8080/jamscloud/webresources` (the desktop client connects to
-this base URL). The Payara admin console (4848) is bound to localhost only.
+this base URL). The Payara admin console (4848) is not published by default (see
+above); when enabled it binds to localhost only.
 
 - **On a Linux server** this works out of the box; just open port 8080 in the
   firewall.
@@ -107,7 +111,8 @@ file in its working directory — see `config/settings.properties.sample`.
   `ADMIN_PASSWORD` is empty a random one is generated and logged once — change it
   after first login.
 - **Login** sends credentials in an `Authorization: Basic` header (POST).
-- **Payara admin** (`4848`) is published to `127.0.0.1` only.
+- **Payara admin** (`4848`) is not published by default; the optional override
+  binds it to `127.0.0.1` only.
 - **Secrets** live in `.env` (git-ignored). For deployment use Docker/host
   secrets and set strong `MYSQL_*` / `ADMIN_PASSWORD`.
 - **TLS**: terminate HTTPS in front of the app, since the container speaks plain

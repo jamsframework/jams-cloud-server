@@ -47,8 +47,9 @@ services:
       # (context root /jamscloud). No TLS yet — put an HTTPS reverse proxy in front
       # before using this over untrusted networks (login uses HTTP Basic auth).
       - "0.0.0.0:8080:8080"
-      # Payara admin console: bound to localhost only, never exposed to the network.
-      - "127.0.0.1:4848:4848"
+      # The Payara admin console (4848) is NOT published by default (it is not
+      # needed to run the service and often clashes with an existing GlassFish).
+      # To expose it on localhost, add the override file — see docker-compose.admin.yml.
     volumes:
       # uploads / tmp / model-exec dirs on the big data partition (see DATA_DIR)
       - ${DATA_DIR:-/home/jamscloud}/data:/opt/payara/jams
