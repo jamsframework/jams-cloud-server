@@ -28,12 +28,14 @@ free disk.
 ## 1. Install prerequisites
 
 ```bash
-# Git and a JDK (build-time only)
+# Git, a JDK (build-time only) and curl/ca-certificates (needed by the Docker
+# installer; curl is often missing on a minimal Debian install)
 sudo apt update
-sudo apt install -y git openjdk-17-jdk
-#   RHEL/Rocky:  sudo dnf install -y git java-17-openjdk-devel
+sudo apt install -y git openjdk-17-jdk curl ca-certificates
+#   RHEL/Rocky:  sudo dnf install -y git java-17-openjdk-devel curl ca-certificates
 
-# Docker Engine + Compose plugin (official convenience script)
+# Docker Engine + Compose plugin (official convenience script; installs Docker CE
+# so you get the "docker compose" v2 plugin — do not use Debian's docker.io)
 curl -fsSL https://get.docker.com | sudo sh
 
 # Run docker without sudo (log out/in afterwards for it to take effect)
