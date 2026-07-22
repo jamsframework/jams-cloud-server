@@ -20,13 +20,13 @@ services:
       MYSQL_USER: ${MYSQL_USER:-jams}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-jams}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-changeme-root}
-    volumes:
-      - db-data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-changeme-root}"]
       interval: 10s
       timeout: 5s
       retries: 12
+    volumes:
+      - ${DATA_DIR:-/home/jamscloud}/db:/var/lib/mysql
     restart: unless-stopped
 
   server:
@@ -55,7 +55,7 @@ services:
     expose:
       - "8080"
     volumes:
-      - jams-data:/opt/payara/jams
+      - ${DATA_DIR:-/home/jamscloud}/data:/opt/payara/jams
     restart: unless-stopped
 
   caddy:
@@ -75,7 +75,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  db-data:
-  jams-data:
   caddy-data:
   caddy-config:

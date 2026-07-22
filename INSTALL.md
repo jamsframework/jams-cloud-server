@@ -109,10 +109,32 @@ MYSQL_ROOT_PASSWORD=<another strong password>
 ADMIN_LOGIN=admin
 ADMIN_PASSWORD=<the admin password you want>
 SERVER_MAX_MEM=8g          # max heap per model run; size to the host's RAM
+DATA_DIR=/home/jamscloud    # host dir for all persistent data (see below)
 ```
 
 If you leave `ADMIN_PASSWORD` empty, a random one is generated and written to the
 server log once (see step 7).
+
+### Prepare the data directory
+
+All persistent data is bind-mounted from `DATA_DIR` on the host, so put it on a
+partition with plenty of free space (the model-execution dirs can grow large):
+
+- `${DATA_DIR}/data` — uploads, temp and per-job model-execution dirs
+- `${DATA_DIR}/db`   — the MySQL database
+
+Bind-mounted host directories do **not** inherit ownership from the image, so
+create them once with the right owners before the first start (the server runs as
+uid 1000, MySQL as uid 999 inside the containers):
+
+```bash
+sudo mkdir -p /home/jamscloud/data /home/jamscloud/db
+sudo chown -R 1000:1000 /home/jamscloud/data   # payara user
+sudo chown -R 999:999   /home/jamscloud/db     # mysql user
+```
+
+(Adjust the path if you changed `DATA_DIR`.) Check free space with
+`df -h /home/jamscloud`.
 
 ---
 
@@ -176,13 +198,19 @@ docker compose logs -f server         # view logs
 docker compose ps                     # container status
 docker compose stop                   # stop (keeps data)
 docker compose start                  # start again
-docker compose down                   # stop and remove containers (keeps volumes/data)
-docker compose down -v                # ALSO delete the database volume (fresh start!)
+docker compose down                   # stop and remove containers (keeps data)
 ```
 
-Data (MySQL, uploads/exec) lives in named Docker volumes and survives restarts
-and reboots (Docker is enabled as a service). `restart: unless-stopped` brings
-the containers back automatically after a reboot.
+All persistent data lives on the host under `DATA_DIR` (`/home/jamscloud` by
+default): `data/` (uploads + model runs) and `db/` (MySQL). Because it is
+bind-mounted, it survives `docker compose down`, restarts and reboots
+(`restart: unless-stopped` brings the containers back after a reboot). To wipe
+everything for a fresh start, stop the stack and delete those directories:
+
+```bash
+docker compose down
+sudo rm -rf /home/jamscloud/data /home/jamscloud/db   # DANGER: deletes all data
+```
 
 **Update to a new version:**
 
@@ -192,8 +220,9 @@ cd ~/jams/jamsserver && git pull && ./mvnw clean package -DskipTests
 docker compose up -d --build
 ```
 
-**Backups:** back up the `db-data` volume (or use `mysqldump` against the `db`
-container) regularly if the data matters.
+**Backups:** back up `DATA_DIR` (`/home/jamscloud` — both `data/` and `db/`)
+regularly if the data matters. For a consistent database dump you can also use
+`docker compose exec db mysqldump -ujams -p"$MYSQL_PASSWORD" jamsserver > backup.sql`.
 
 ---
 

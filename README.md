@@ -93,8 +93,9 @@ Two modes, selected via `.env` (see `docker/Caddyfile`):
 |----------------------|---------|
 | `MYSQL_HOST/PORT/DB/USER/PASSWORD` | JPA datasource (`jdbc/jamsserver`) |
 | `DATABASE_URL/USER/PASSWORD`       | Flyway migrations at startup |
-| `UPLOAD_DIRECTORY/TMP_DIRECTORY/EXEC_DIRECTORY` | server working dirs |
+| `UPLOAD_DIRECTORY/TMP_DIRECTORY/EXEC_DIRECTORY` | server working dirs (inside the container) |
 | `SERVER_MAX_MEM`                   | heap for a model run (default `8g`) |
+| `DATA_DIR`                         | host dir for persistent data, bind-mounted (default `/home/jamscloud`): `data/` = uploads+model runs, `db/` = MySQL |
 
 Without environment variables the server falls back to a `settings.properties`
 file in its working directory — see `config/settings.properties.sample`.
