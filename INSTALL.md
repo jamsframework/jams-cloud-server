@@ -133,10 +133,13 @@ create them once with the right owners before the first start (the server runs a
 uid 1000, MySQL as uid 999 inside the containers):
 
 ```bash
-sudo mkdir -p /home/jamscloud/data /home/jamscloud/db
+sudo mkdir -p /home/jamscloud/data/upload /home/jamscloud/data/tmp /home/jamscloud/data/exec /home/jamscloud/db
 sudo chown -R 1000:1000 /home/jamscloud/data   # payara user
 sudo chown -R 999:999   /home/jamscloud/db     # mysql user
 ```
+
+(The server also creates the `upload/tmp/exec` subdirectories itself on startup;
+creating them here just makes sure the ownership is right from the beginning.)
 
 (Adjust the path if you changed `DATA_DIR`.) Check free space with
 `df -h /home/jamscloud`.

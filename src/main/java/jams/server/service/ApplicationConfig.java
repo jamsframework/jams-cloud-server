@@ -65,6 +65,17 @@ public class ApplicationConfig extends Application {
                     SERVER_UPLOAD_DIRECTORY + ", " +
                     SERVER_TMP_DIRECTORY + ", " +
                     SERVER_EXEC_DIRECTORY + "], max-mem " + SERVER_MAX_MEM);
+            // Ensure the working directories exist. With a bind-mounted data volume
+            // these subdirectories are not provided by the image, so create them.
+            for (String dir : new String[]{SERVER_UPLOAD_DIRECTORY, SERVER_TMP_DIRECTORY, SERVER_EXEC_DIRECTORY}) {
+                if (dir != null && !dir.isEmpty()) {
+                    try {
+                        new File(dir).mkdirs();
+                    } catch (Throwable t) {
+                        log.log(Level.WARNING, "Could not create directory " + dir, t);
+                    }
+                }
+            }
         }
     };
 
