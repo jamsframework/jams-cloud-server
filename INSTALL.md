@@ -84,7 +84,7 @@ cd ~/jams/jams
 ```bash
 cd ~/jams/jamsserver
 ./mvnw clean package -DskipTests
-# result: target/jams-cloud-server.war
+# result: target/jamsserver.war
 ```
 
 ---

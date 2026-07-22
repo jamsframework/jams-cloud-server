@@ -23,7 +23,7 @@ time by the Eclipse Transformer and bundled into the WAR.
 ./mvnw clean package
 ```
 
-Produces `target/jams-cloud-server.war`.
+Produces `target/jamsserver.war`.
 
 ## Run with Docker (recommended)
 

@@ -3,7 +3,7 @@
 # "models run on Java 8" problem disappears with this image.
 #
 # Build context is the repository root; run `./mvnw package` first so that
-# target/jams-cloud-server.war exists.
+# target/jamsserver.war exists.
 FROM payara/server-full:6.2025.11-jdk17
 
 # MySQL 8 JDBC driver at domain scope — the JTA connection pool created from
@@ -26,4 +26,4 @@ RUN mkdir -p /opt/payara/jams/upload /opt/payara/jams/tmp /opt/payara/jams/exec 
     && chown -R payara:payara /opt/payara/jams
 
 # Auto-deployed on server start.
-COPY --chown=payara:payara target/jams-cloud-server.war ${DEPLOY_DIR}/
+COPY --chown=payara:payara target/jamsserver.war ${DEPLOY_DIR}/

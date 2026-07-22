@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.jams</groupId>
-    <artifactId>jams-cloud-server</artifactId>
+    <artifactId>jamsserver</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>war</packaging>
     <name>JAMS Cloud Server</name>
@@ -97,7 +97,7 @@
     </dependencies>
 
     <build>
-        <finalName>jams-cloud-server</finalName>
+        <finalName>jamsserver</finalName>
         <plugins>
             <!-- 1. (Weg B) javax-Original von jams-cloud-core nach target/ kopieren -->
             <plugin>
